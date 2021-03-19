@@ -1,0 +1,231 @@
+
+Step 1: Create All required tables
+CREATE TABLE Table_USA
+(  
+Customer_Name VARCHAR(255) PRIMARY KEY,
+Customer_Id VARCHAR(255) NOT NULL,
+Customer_Open_Date datetime2 NOT NULL,
+Last_Consulted_Date datetime2,
+Vaccination_Type CHAR(5),
+Doctor_Consulted CHAR(255),
+State  CHAR(5)
+Country CHAR(5),
+Post_Code int,
+Date_of_Birth datetime2,
+Active_Customer CHAR(1)
+)  
+WITH  
+  (   
+    DISTRIBUTION = HASH (Customer_Name),   
+    CLUSTERED COLUMNSTORE INDEX  
+  );  
+  
+  
+
+CREATE TABLE Table_IND
+(  
+Customer_Name VARCHAR(255) PRIMARY KEY,
+Customer_Id VARCHAR(255) NOT NULL,
+Customer_Open_Date datetime2 NOT NULL,
+Last_Consulted_Date datetime2,
+Vaccination_Type CHAR(5),
+Doctor_Consulted CHAR(255),
+State  CHAR(5)
+Country CHAR(5),
+Post_Code int,
+Date_of_Birth datetime2,
+Active_Customer CHAR(1)
+)  
+WITH  
+  (   
+    DISTRIBUTION = HASH (Customer_Name),   
+    CLUSTERED COLUMNSTORE INDEX  
+  );  
+  
+  
+
+CREATE TABLE Table_PHIL 
+(  
+Customer_Name VARCHAR(255) PRIMARY KEY,
+Customer_Id VARCHAR(255) NOT NULL,
+Customer_Open_Date datetime2 NOT NULL,
+Last_Consulted_Date datetime2,
+Vaccination_Type CHAR(5),
+Doctor_Consulted CHAR(255),
+State  CHAR(5)
+Country CHAR(5),
+Post_Code int,
+Date_of_Birth datetime2,
+Active_Customer CHAR(1)
+)  
+WITH  
+  (   
+    DISTRIBUTION = HASH (Customer_Name),   
+    CLUSTERED COLUMNSTORE INDEX  
+  );  
+  
+  
+
+CREATE TABLE Table_NYC 
+(  
+Customer_Name VARCHAR(255) PRIMARY KEY,
+Customer_Id VARCHAR(255) NOT NULL,
+Customer_Open_Date datetime2 NOT NULL,
+Last_Consulted_Date datetime2,
+Vaccination_Type CHAR(5),
+Doctor_Consulted CHAR(255),
+State  CHAR(5)
+Country CHAR(5),
+Post_Code int,
+Date_of_Birth datetime2,
+Active_Customer CHAR(1)
+)  
+WITH  
+  (   
+    DISTRIBUTION = HASH (Customer_Name),   
+    CLUSTERED COLUMNSTORE INDEX  
+  );  
+  
+  
+
+CREATE TABLE Table_AU 
+(  
+Customer_Name VARCHAR(255) PRIMARY KEY,
+Customer_Id VARCHAR(255) NOT NULL,
+Customer_Open_Date datetime2 NOT NULL,
+Last_Consulted_Date datetime2,
+Vaccination_Type CHAR(5),
+Doctor_Consulted CHAR(255),
+State  CHAR(5)
+Country CHAR(5),
+Post_Code int,
+Date_of_Birth datetime2,
+Active_Customer CHAR(1)
+)  
+WITH  
+  (   
+    DISTRIBUTION = HASH (Customer_Name),   
+    CLUSTERED COLUMNSTORE INDEX  
+  );  
+  
+  Step 2: Create Required connections
+  
+CREATE DATABASE SCOPED CREDENTIAL ADLS_credential
+WITH
+  IDENTITY = 'customerdata' ,
+  SECRET = 'yz5N4+bxSb89McdiysJAzo+9hgEHcJRJuXbF/uC3mhbezES/oe00vXnZEl14U0lN3vxrFKsphKov16C0w6aiTQ=='
+;
+
+
+CREATE EXTERNAL DATA SOURCE ADLSCustomerfile
+WITH
+  ( LOCATION = 'abfss://2013@newyorktaxidataset.dfs.core.windows.net' ,
+    CREDENTIAL = ADLS_credential ,
+    TYPE = HADOOP
+  ) ;
+  
+  
+ CREATE EXTERNAL FILE FORMAT CustFileDelimited  
+WITH (  
+    FORMAT_TYPE = DELIMITEDTEXT,  
+    FORMAT_OPTIONS (  
+        FIELD_TERMINATOR = '|',  
+        DATE_FORMAT = 'yyyyMMdd' ),  
+    DATA_COMPRESSION = 'org.apache.hadoop.io.compress.DefaultCodec'
+);  
+
+Step 3: Create Stored procedure to read data using polybase
+
+
+--
+create procedure dbo.uspLoadCustomerFile
+AS
+declare @SQL nvarchar(max)
+declare @SQL1 nvarchar(max)
+declare @SQL2 nvarchar(max)
+declare @SQL3 nvarchar(max)
+declare @SQL4 nvarchar(max)
+declare @SQL5 nvarchar(max)
+BEGIN
+DROP TABLE IF EXISTS [dbo].[CustomerExt]
+
+CREATE EXTERNAL TABLE [dbo].[CustomerExt]
+( Customer_Name nvarchar(255)
+Customer_Id nvarchar(255),
+Open_Date nvarchar(20),
+Last_Consulted_Date nvarchar(25),
+Vaccination_Id nvarchar(25),
+Dr_Name nvarchar(25),
+State nvarchar(25),
+Country nvarchar(25),
+DOB nvarchar(25),
+Is_Active (2)
+WITH
+(
+    LOCATION='/CustomerFile location/' ,
+    DATA_SOURCE = ADLSCustomerfile,
+    FILE_FORMAT = TextFileFormat ,
+    REJECT_TYPE = VALUE ,
+    REJECT_VALUE = 0
+) ;
+
+DROP TABLE IF EXISTS #TempCustExt
+create table #TempCustExt
+( Customer_Name VARCHAR(255),
+Customer_Id VARCHAR(255),
+Open_Date datetime2,
+Last_Consulted_Date datetime2,
+Vaccination_Id CHAR(5),
+Dr_Name CHAR(255),
+State CHAR(5),
+Country CHAR(5),
+DOB datetime2,
+Is_Active CHAR(1)
+)
+
+set @SQL= 'INSERT INTO #TempCustExt(Customer_Name,Customer_Id,Open_Date,Last_Consulted_Date,Vaccination_Id,Dr_Name,State,Country,DOB,Is_Active)
+SELECT convert(VARCHAR(255),Customer_Name) as Customer_Name,convert(VARCHAR(255),Customer_Id) as Customer_Id,convert(datetime2,Open_Date) as Open_Date  ,
+convert(datetime2,Last_Consulted_Date) as Last_Consulted_Date,convart(CHAR(5),Vaccination_Id) as Vaccination_Id,convert(CHAR(255),Dr_Name) as Dr_Name,
+convert(CHAR(5),State) as State,convert(CHAR(5),Country) as Country,convert(datetime2,DOB) as DOB ,convert(CHAR(1),Is_Active) as  Is_Active  from  [dbo].[CustomerExt]'
+execute (@SQL)
+
+set @SQL1 ='INSERT INTO Table_USA (Customer_Name ,Customer_Id ,Customer_Open_Date ,Last_Consulted_Date ,Vaccination_Type ,Doctor_Consulted ,State  ,Country ,
+Date_of_Birth ,Active_Customer) 
+
+SELECT  Customer_Name,Customer_Id,Open_Date  ,Last_Consulted_Date,Vaccination_Id, Dr_Name,State,Country, DOB , Is_Active  from #TempCustExt
+where Country=''USA'''
+execute (@SQL1)
+
+set @SQL2 ='INSERT INTO Table_IND  (Customer_Name ,Customer_Id ,Customer_Open_Date ,Last_Consulted_Date ,Vaccination_Type ,Doctor_Consulted ,State  ,Country ,
+Date_of_Birth ,Active_Customer) 
+
+SELECT  Customer_Name,Customer_Id,Open_Date  ,Last_Consulted_Date,Vaccination_Id, Dr_Name,State,Country, DOB , Is_Active  from #TempCustExt
+where Country=''IND'''
+execute (@SQL2)
+set @SQL3 ='INSERT INTO Table_PHIL (Customer_Name ,Customer_Id ,Customer_Open_Date ,Last_Consulted_Date ,Vaccination_Type ,Doctor_Consulted ,State  ,Country ,
+Date_of_Birth ,Active_Customer) 
+
+SELECT  Customer_Name,Customer_Id,Open_Date  ,Last_Consulted_Date,Vaccination_Id, Dr_Name,State,Country, DOB , Is_Active  from #TempCustExt
+where Country=''PHIL'''
+execute (@SQL3)
+
+set @SQL4 ='INSERT INTO Table_NYC (Customer_Name ,Customer_Id ,Customer_Open_Date ,Last_Consulted_Date ,Vaccination_Type ,Doctor_Consulted ,State  ,Country ,
+Date_of_Birth ,Active_Customer) 
+
+SELECT  Customer_Name,Customer_Id,Open_Date  ,Last_Consulted_Date,Vaccination_Id, Dr_Name,State,Country, DOB , Is_Active  from #TempCustExt
+where Country=''NYC'''
+execute (@SQL4)
+
+set @SQL5 ='INSERT INTO Table_AU (Customer_Name ,Customer_Id ,Customer_Open_Date ,Last_Consulted_Date ,Vaccination_Type ,Doctor_Consulted ,State  ,Country ,
+Date_of_Birth ,Active_Customer) 
+
+SELECT  Customer_Name,Customer_Id,Open_Date  ,Last_Consulted_Date,Vaccination_Id, Dr_Name,State,Country, DOB , Is_Active  from #TempCustExt
+where Country=''AU'''
+execute (@SQL5)
+END
+DROP TABLE #TempCustExt
+
+
+
+
+  
